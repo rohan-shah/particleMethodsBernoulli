@@ -1,0 +1,15 @@
+Package: particleMethodsBernoulli
+Type: Package
+Title: Monte Carlo methods for a simple Bernoulli example
+Version: 0.1
+Date: 2015-05-14
+Author: Rohan Shah
+Maintainer: Rohan Shah <cran@bookshah.com>
+Description: Monte Carlo methods for a simple estimation problem involving Bernoulli random variables
+License: GPL v3
+LazyData: No
+Depends: Rmpfr
+Collate:
+	'classes.R'
+	'Rcpp_exceptions.R'
+	'onLoad.R'
