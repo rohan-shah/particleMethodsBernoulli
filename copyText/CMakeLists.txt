@@ -6,7 +6,7 @@ else()
 	add_custom_target(copyText ALL)
 endif()
 
-set(RFiles R/classes.R R/onLoad.R)
+set(RFiles R/classes.R R/onLoad.R R/importanceSampling.R R/importanceResampling.R)
 set(RPackageFiles DESCRIPTION NAMESPACE ${RFiles})
 
 #Find location of Rcpp_exceptions.R 

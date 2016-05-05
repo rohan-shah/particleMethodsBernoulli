@@ -5,10 +5,12 @@
 	#define RcppExport extern "C" __declspec(dllexport)
 #endif
 #include "importanceSampling.h"
+#include "importanceResampling.h"
 extern "C" const char* package_name = "particleMethodsBernoulli";
 R_CallMethodDef callMethods[] = 
 {
 	{"importanceSampling", (DL_FUNC)&particleMethodsBernoulli::importanceSampling, 5},
+	{"importanceResampling", (DL_FUNC)&particleMethodsBernoulli::importanceResampling, 5},
 	{NULL, NULL, 0}
 };
 RcppExport void R_init_particleMethodsBernoulli(DllInfo *info)
