@@ -3,6 +3,8 @@
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/bernoulli_distribution.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
+#include <boost/random/random_number_generator.hpp>
+#include <boost/range/algorithm/random_shuffle.hpp>
 namespace particleMethodsBernoulli
 {
 	SEXP importanceResamplingWithoutReplacement(SEXP nBernoullis_sexp, SEXP lowerBound_sexp, SEXP trueProbability_sexp, SEXP n_sexp, SEXP seed_sexp)
@@ -80,16 +82,20 @@ namespace particleMethodsBernoulli
 		
 		boost::mt19937 randomSource;
 		randomSource.seed(seed);
+		boost::random_number_generator<boost::mt19937> generator(randomSource);
+
 		double newProbability = (double)lowerBound / (double)nBernoullis;
 		double ratio1 = newProbability / trueProbability, ratio2 = (1 - newProbability) / (1 - trueProbability);
-		boost::random::bernoulli_distribution<> bernoulli(newProbability);
+		double total = ratio1 + ratio2;
+		mpfr_class probability1 = ratio1/total, probability2 = ratio2/total;
+		boost::random::bernoulli_distribution<> raoHartleyCochranBernoulli(ratio1/total);
 		//Initially we have two samples, corresponding to the first bernoulli being 0 or 1. Note that nBernoullis == 1 gives an error above, so we can assume that there are at least 2 bernoullis
 		std::vector<int> samples, newSamples;
-		std::vector<std::pair<int, int> > sampleWeights, newSampleWeights;
+		std::vector<mpfr_class> sampleWeights, newSampleWeights;
 		samples.push_back(0);
 		samples.push_back(1);
-		sampleWeights.push_back(std::make_pair(0, 0));
-		sampleWeights.push_back(std::make_pair(0, 0));
+		sampleWeights.push_back(1);
+		sampleWeights.push_back(1);
 		std::vector<int> choicesUp, choicesDown;
 
 		mpfr_class product = 1;
@@ -129,13 +135,41 @@ namespace particleMethodsBernoulli
 			}
 			else
 			{
-				throw std::runtime_error("Not Implemented");
+				boost::random_shuffle(choicesUp, generator);
+				boost::random_shuffle(choicesDown, generator);
+				int sampled = 0;
+				int nPairs = choicesUp.size() + choicesDown.size() - n;
+				mpfr_class upProbability = ((double)nPairs / (double)choicesUp.size()) * probability1 + (double)(choicesUp.size() - nPairs) / (double)choicesUp.size();
+				mpfr_class downProbability = ((double)nPairs / (double)choicesDown.size()) * probability2 + (double)(choicesDown.size() - nPairs) / (double)choicesDown.size();
+				for(; sampled < nPairs; sampled++)
+				{
+					if(raoHartleyCochranBernoulli(randomSource))
+					{
+						newSamples.push_back(samples[choicesUp[sampled]]+1);
+						newSampleWeights.push_back(sampleWeights[choicesUp[sampled]] * upProbability);
+					}
+					else
+					{
+						newSamples.push_back(samples[choicesDown[sampled]]);
+						newSampleWeights.push_back(sampleWeights[choicesDown[sampled]] * downProbability);
+					}
+				}
+				for(; sampled < (int)choicesUp.size(); sampled++)
+				{
+					newSamples.push_back(samples[choicesUp[sampled]]+1);
+					newSampleWeights.push_back(sampleWeights[choicesUp[sampled]] * upProbability);
+					if(sampled < (int)choicesDown.size()) 
+					{
+						newSamples.push_back(samples[choicesDown[sampled]]);
+						newSampleWeights.push_back(sampleWeights[choicesDown[sampled]] * downProbability);
+					}
+				}
+				if((int)newSamples.size() != n) throw std::runtime_error("Internal error");
 			}
 			samples.swap(newSamples);
 			sampleWeights.swap(newSampleWeights);
 		}
-		std::vector<int> table((nBernoullis+1)*(nBernoullis+1), -1);
-		std::vector<mpfr_class> powerPairs, densityValues(nBernoullis+1);
+		std::vector<mpfr_class> densityValues(nBernoullis+1);
 		mpfr_class power1 = trueProbability, power2 = 1 - trueProbability;
 		for(int i = 0; i <= nBernoullis; i++)
 		{
@@ -143,18 +177,9 @@ namespace particleMethodsBernoulli
 		}
 
 		mpfr_class estimate = 0;
-		mpfr_class ratio1_mpfr = ratio1;
-		mpfr_class ratio2_mpfr = ratio2;
 		for(std::size_t i = 0; i < samples.size(); i++)
 		{
-			std::pair<int, int> weight = sampleWeights[i];
-			if(table[weight.first + weight.second * (nBernoullis+1)] == -1)
-			{
-				mpfr_class power = boost::multiprecision::pow(ratio1_mpfr, weight.first) * boost::multiprecision::pow(ratio2_mpfr, weight.second);
-				table[weight.first + weight.second * (nBernoullis+1)] = powerPairs.size();
-				powerPairs.push_back(power);
-			}
-			estimate += powerPairs[table[weight.first + weight.second*(nBernoullis+1)]] * densityValues[samples[i]];
+			estimate += densityValues[samples[i]] / sampleWeights[i];
 		}
 		return Rcpp::List::create(Rcpp::Named("estimate") = estimate.convert_to<double>());
 	END_RCPP
