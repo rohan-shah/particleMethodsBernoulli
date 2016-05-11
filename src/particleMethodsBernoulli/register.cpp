@@ -10,7 +10,7 @@
 extern "C" const char* package_name = "particleMethodsBernoulli";
 R_CallMethodDef callMethods[] = 
 {
-	{"importanceSampling", (DL_FUNC)&particleMethodsBernoulli::importanceSampling, 5},
+	{"importanceSampling", (DL_FUNC)&particleMethodsBernoulli::importanceSampling, 4},
 	{"importanceResampling", (DL_FUNC)&particleMethodsBernoulli::importanceResampling, 5},
 	{"importanceResamplingWithoutReplacement", (DL_FUNC)&particleMethodsBernoulli::importanceResamplingWithoutReplacement, 5},
 	{NULL, NULL, 0}

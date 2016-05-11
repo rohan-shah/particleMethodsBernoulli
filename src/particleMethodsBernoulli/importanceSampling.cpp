@@ -4,22 +4,26 @@
 #include <boost/random/bernoulli_distribution.hpp>
 namespace particleMethodsBernoulli
 {
-	SEXP importanceSampling(SEXP nBernoullis_sexp, SEXP lowerBound_sexp, SEXP trueProbability_sexp, SEXP n_sexp, SEXP seed_sexp)
+	SEXP importanceSampling(SEXP lowerBound_sexp, SEXP trueProbabilities_sexp, SEXP n_sexp, SEXP seed_sexp)
 	{
 	BEGIN_RCPP
-		int nBernoullis;
+		std::vector<double> trueProbabilities;
 		try
 		{
-			nBernoullis = Rcpp::as<int>(nBernoullis_sexp);
+			trueProbabilities = Rcpp::as<std::vector<double> >(trueProbabilities_sexp);
 		}
 		catch(...)
 		{
-			throw std::runtime_error("Input nBernoullis must be an integer");
+			throw std::runtime_error("Input trueProbabilities must be a numeric vector");
 		}
-		if(nBernoullis < 0)
+		for(std::vector<double>::iterator trueProbability = trueProbabilities.begin(); trueProbability != trueProbabilities.end(); trueProbability++)
 		{
-			throw std::runtime_error("Input nBernoullis must be positive");
+			if(*trueProbability <= 0 || *trueProbability >= 1)
+			{
+				throw std::runtime_error("Input trueProbability must be in (0, 1)");
+			}
 		}
+		int nBernoullis = trueProbabilities.size();
 
 		int lowerBound;
 		try
@@ -37,20 +41,6 @@ namespace particleMethodsBernoulli
 		if(lowerBound >= nBernoullis)
 		{
 			throw std::runtime_error("Input lowerBound must be smaller than nBernoullis");
-		}
-
-		double trueProbability;
-		try
-		{
-			trueProbability = Rcpp::as<double>(trueProbability_sexp);
-		}
-		catch(...)
-		{
-			throw std::runtime_error("Input trueProbability must be a number");
-		}
-		if(trueProbability <= 0 || trueProbability >= 1)
-		{
-			throw std::runtime_error("Input trueProbability must be in (0, 1)");
 		}
 
 		int n;
@@ -80,7 +70,12 @@ namespace particleMethodsBernoulli
 		boost::mt19937 randomSource;
 		randomSource.seed(seed);
 		double newProbability = (double)lowerBound / (double)nBernoullis;
-		double ratio1 = trueProbability / newProbability, ratio2 = (1 - trueProbability) / (1 - newProbability);
+		std::vector<double> ratio1, ratio2;
+		for(std::vector<double>::iterator trueProbability = trueProbabilities.begin(); trueProbability != trueProbabilities.end(); trueProbability++)
+		{
+			ratio1.push_back(*trueProbability / newProbability);
+			ratio2.push_back((1 - *trueProbability) / (1 - newProbability));
+		}
 		boost::random::bernoulli_distribution<> bernoulli(newProbability);
 		mpfr_class sum = 0, sumSquared = 0;
 		for(int i = 0; i < n; i++)
@@ -93,11 +88,11 @@ namespace particleMethodsBernoulli
 				if(value)
 				{
 					valuesOfOne++;
-					likelihoodRatio *= ratio1;
+					likelihoodRatio *= ratio1[bernoulliCounter];
 				}
 				else
 				{
-					likelihoodRatio *= ratio2;
+					likelihoodRatio *= ratio2[bernoulliCounter];
 				}
 				//Break if we can never be above the lower bound
 				if(valuesOfOne + nBernoullis - 1 - bernoulliCounter <= lowerBound) break;
