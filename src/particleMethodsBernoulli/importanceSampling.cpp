@@ -80,7 +80,7 @@ namespace particleMethodsBernoulli
 		mpfr_class sum = 0, sumSquared = 0;
 		for(int i = 0; i < n; i++)
 		{
-			double likelihoodRatio = 1;
+			mpfr_class likelihoodRatio = 1;
 			int valuesOfOne = 0;
 			for(int bernoulliCounter = 0; bernoulliCounter < nBernoullis; bernoulliCounter++)
 			{

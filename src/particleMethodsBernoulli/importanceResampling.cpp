@@ -5,22 +5,26 @@
 #include <boost/random/uniform_int_distribution.hpp>
 namespace particleMethodsBernoulli
 {
-	SEXP importanceResampling(SEXP nBernoullis_sexp, SEXP lowerBound_sexp, SEXP trueProbability_sexp, SEXP n_sexp, SEXP seed_sexp)
+	SEXP importanceResampling(SEXP lowerBound_sexp, SEXP trueProbabilities_sexp, SEXP n_sexp, SEXP seed_sexp)
 	{
 	BEGIN_RCPP
-		int nBernoullis;
+		std::vector<double> trueProbabilities;
 		try
 		{
-			nBernoullis = Rcpp::as<int>(nBernoullis_sexp);
+			trueProbabilities = Rcpp::as<std::vector<double> >(trueProbabilities_sexp);
 		}
 		catch(...)
 		{
-			throw std::runtime_error("Input nBernoullis must be an integer");
+			throw std::runtime_error("Input trueProbabilities must be a numeric vector");
 		}
-		if(nBernoullis < 0)
+		for(std::vector<double>::iterator trueProbability = trueProbabilities.begin(); trueProbability != trueProbabilities.end(); trueProbability++)
 		{
-			throw std::runtime_error("Input nBernoullis must be positive");
+			if(*trueProbability <= 0 || *trueProbability >= 1)
+			{
+				throw std::runtime_error("Input trueProbability must be in (0, 1)");
+			}
 		}
+		int nBernoullis = trueProbabilities.size();
 
 		int lowerBound;
 		try
@@ -38,20 +42,6 @@ namespace particleMethodsBernoulli
 		if(lowerBound >= nBernoullis)
 		{
 			throw std::runtime_error("Input lowerBound must be smaller than nBernoullis");
-		}
-
-		double trueProbability;
-		try
-		{
-			trueProbability = Rcpp::as<double>(trueProbability_sexp);
-		}
-		catch(...)
-		{
-			throw std::runtime_error("Input trueProbability must be a number");
-		}
-		if(trueProbability <= 0 || trueProbability >= 1)
-		{
-			throw std::runtime_error("Input trueProbability must be in (0, 1)");
 		}
 
 		int n;
@@ -81,7 +71,12 @@ namespace particleMethodsBernoulli
 		boost::mt19937 randomSource;
 		randomSource.seed(seed);
 		double newProbability = (double)lowerBound / (double)nBernoullis;
-		double ratio1 = trueProbability / newProbability, ratio2 = (1 - trueProbability) / (1 - newProbability);
+		std::vector<double> ratio1, ratio2;
+		for(std::vector<double>::iterator trueProbability = trueProbabilities.begin(); trueProbability != trueProbabilities.end(); trueProbability++)
+		{
+			ratio1.push_back(*trueProbability / newProbability);
+			ratio2.push_back((1 - *trueProbability) / (1 - newProbability));
+		}
 		boost::random::bernoulli_distribution<> bernoulli(newProbability);
 		std::vector<int> valuesOfOne(n, 0);
 		std::vector<int> newValuesOfOne(n, 0);
@@ -133,7 +128,7 @@ namespace particleMethodsBernoulli
 			else
 			{
 				//With this probability we select something with weight ratio1
-				boost::random::bernoulli_distribution<> bernoulliForResampling(weightRatio1.size() * ratio1 / (weightRatio1.size() * ratio1 + weightRatio2.size() * ratio2));
+				boost::random::bernoulli_distribution<> bernoulliForResampling(weightRatio1.size() * ratio1[bernoulliCounter] / (weightRatio1.size() * ratio1[bernoulliCounter] + weightRatio2.size() * ratio2[bernoulliCounter]));
 				boost::random::uniform_int_distribution<> ratio2Sampler(0, weightRatio2.size()-1);
 				boost::random::uniform_int_distribution<> ratio1Sampler(0, weightRatio1.size()-1);
 				for(int i = 0; i < n; i++)
@@ -150,7 +145,7 @@ namespace particleMethodsBernoulli
 			}
 			valuesOfOne.swap(newValuesOfOne);
 			//Update average weight
-			averageWeight *= (weightRatio1.size() * ratio1 + weightRatio2.size() * ratio2) / n;
+			averageWeight *= (weightRatio1.size() * ratio1[bernoulliCounter] + weightRatio2.size() * ratio2[bernoulliCounter]) / n;
 		}
 returnAnswer:
 		return Rcpp::List::create(Rcpp::Named("estimate") = averageWeight.convert_to<double>());

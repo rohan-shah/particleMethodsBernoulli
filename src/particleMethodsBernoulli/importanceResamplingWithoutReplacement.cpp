@@ -7,22 +7,26 @@
 #include <boost/range/algorithm/random_shuffle.hpp>
 namespace particleMethodsBernoulli
 {
-	SEXP importanceResamplingWithoutReplacement(SEXP nBernoullis_sexp, SEXP lowerBound_sexp, SEXP trueProbability_sexp, SEXP n_sexp, SEXP seed_sexp)
+	SEXP importanceResamplingWithoutReplacement(SEXP lowerBound_sexp, SEXP trueProbabilities_sexp, SEXP n_sexp, SEXP seed_sexp)
 	{
 	BEGIN_RCPP
-		int nBernoullis;
+		std::vector<double> trueProbabilities;
 		try
 		{
-			nBernoullis = Rcpp::as<int>(nBernoullis_sexp);
+			trueProbabilities = Rcpp::as<std::vector<double> >(trueProbabilities_sexp);
 		}
 		catch(...)
 		{
-			throw std::runtime_error("Input nBernoullis must be an integer");
+			throw std::runtime_error("Input trueProbabilities must be a numeric vector");
 		}
-		if(nBernoullis < 0)
+		for(std::vector<double>::iterator trueProbability = trueProbabilities.begin(); trueProbability != trueProbabilities.end(); trueProbability++)
 		{
-			throw std::runtime_error("Input nBernoullis must be positive");
+			if(*trueProbability <= 0 || *trueProbability >= 1)
+			{
+				throw std::runtime_error("Input trueProbability must be in (0, 1)");
+			}
 		}
+		int nBernoullis = trueProbabilities.size();
 
 		int lowerBound;
 		try
@@ -40,20 +44,6 @@ namespace particleMethodsBernoulli
 		if(lowerBound >= nBernoullis)
 		{
 			throw std::runtime_error("Input lowerBound must be smaller than nBernoullis");
-		}
-
-		double trueProbability;
-		try
-		{
-			trueProbability = Rcpp::as<double>(trueProbability_sexp);
-		}
-		catch(...)
-		{
-			throw std::runtime_error("Input trueProbability must be a number");
-		}
-		if(trueProbability <= 0 || trueProbability >= 1)
-		{
-			throw std::runtime_error("Input trueProbability must be in (0, 1)");
 		}
 
 		int n;
@@ -85,25 +75,34 @@ namespace particleMethodsBernoulli
 		boost::random_number_generator<boost::mt19937> generator(randomSource);
 
 		double newProbability = (double)lowerBound / (double)nBernoullis;
-		double ratio1 = newProbability / trueProbability, ratio2 = (1 - newProbability) / (1 - trueProbability);
-		double total = ratio1 + ratio2;
-		mpfr_class probability1 = ratio1/total, probability2 = ratio2/total;
-		boost::random::bernoulli_distribution<> raoHartleyCochranBernoulli(ratio1/total);
+		std::vector<double> ratio1, ratio2, totals;
+		for(std::vector<double>::iterator trueProbability = trueProbabilities.begin(); trueProbability != trueProbabilities.end(); trueProbability++)
+		{
+			ratio1.push_back(*trueProbability / newProbability);
+			ratio2.push_back((1 - *trueProbability) / (1 - newProbability));
+			totals.push_back(ratio1.back() + ratio2.back());
+		}
 		//Initially we have two samples, corresponding to the first bernoulli being 0 or 1. Note that nBernoullis == 1 gives an error above, so we can assume that there are at least 2 bernoullis
 		std::vector<int> samples, newSamples;
 		std::vector<mpfr_class> sampleWeights, newSampleWeights;
+		std::vector<mpfr_class> densityValues, newDensityValues;
+
 		samples.push_back(0);
 		samples.push_back(1);
 		sampleWeights.push_back(1);
 		sampleWeights.push_back(1);
+		densityValues.push_back(1-trueProbabilities[0]);
+		densityValues.push_back(trueProbabilities[0]);
 		std::vector<int> choicesUp, choicesDown;
 
 		mpfr_class product = 1;
 		for(int bernoulliCounter = 1; bernoulliCounter < nBernoullis; bernoulliCounter++)
 		{
+			boost::random::bernoulli_distribution<> raoHartleyCochranBernoulli(ratio1[bernoulliCounter]/totals[bernoulliCounter]);
+			mpfr_class probability1 = ratio1[bernoulliCounter]/totals[bernoulliCounter], probability2 = ratio2[bernoulliCounter]/totals[bernoulliCounter];
 			choicesUp.clear();
 			choicesDown.clear();
-			//Sample and update the weights. Everything in weightRatio1 has a weight of averageWeight * ratio1. Everything in weightRatio2 has a weight of averageWeight * ratio2. Anything in neither has a weight of 0. 
+			//Sample and update the weights. Everything in weightRatio1 has a weight of averageWeight * ratio1[bernoulliCounter]. Everything in weightRatio2 has a weight of averageWeight * ratio2[bernouliCounter]. Anything in neither has a weight of 0. 
 			for(std::size_t i = 0; i < samples.size(); i++)
 			{
 				int maxPossible = samples[i] + nBernoullis - bernoulliCounter;
@@ -119,6 +118,8 @@ namespace particleMethodsBernoulli
 			}
 			newSamples.clear();
 			newSampleWeights.clear();
+			newDensityValues.clear();
+			double complementaryTrueProb = 1 - trueProbabilities[bernoulliCounter];
 			//We take every successor
 			if(choicesUp.size() + choicesDown.size() <= (std::size_t)n)
 			{
@@ -126,11 +127,13 @@ namespace particleMethodsBernoulli
 				{
 					newSamples.push_back(samples[choicesDown[i]]);
 					newSampleWeights.push_back(sampleWeights[choicesDown[i]]);
+					newDensityValues.push_back(densityValues[choicesDown[i]] * complementaryTrueProb);
 				}
 				for(std::size_t i = 0; i < choicesUp.size(); i++)
 				{
 					newSamples.push_back(samples[choicesUp[i]]+1);
 					newSampleWeights.push_back(sampleWeights[choicesUp[i]]);
+					newDensityValues.push_back(densityValues[choicesUp[i]] * trueProbabilities[bernoulliCounter]);
 				}
 			}
 			else
@@ -147,39 +150,37 @@ namespace particleMethodsBernoulli
 					{
 						newSamples.push_back(samples[choicesUp[sampled]]+1);
 						newSampleWeights.push_back(sampleWeights[choicesUp[sampled]] * upProbability);
+						newDensityValues.push_back(densityValues[choicesUp[sampled]] * trueProbabilities[bernoulliCounter]);
 					}
 					else
 					{
 						newSamples.push_back(samples[choicesDown[sampled]]);
 						newSampleWeights.push_back(sampleWeights[choicesDown[sampled]] * downProbability);
+						newDensityValues.push_back(densityValues[choicesDown[sampled]] * complementaryTrueProb);
 					}
 				}
 				for(; sampled < (int)choicesUp.size(); sampled++)
 				{
 					newSamples.push_back(samples[choicesUp[sampled]]+1);
 					newSampleWeights.push_back(sampleWeights[choicesUp[sampled]] * upProbability);
+					newDensityValues.push_back(densityValues[choicesUp[sampled]] * trueProbabilities[bernoulliCounter]);
 					if(sampled < (int)choicesDown.size()) 
 					{
 						newSamples.push_back(samples[choicesDown[sampled]]);
 						newSampleWeights.push_back(sampleWeights[choicesDown[sampled]] * downProbability);
+						newDensityValues.push_back(densityValues[choicesDown[sampled]] * complementaryTrueProb);
 					}
 				}
 				if((int)newSamples.size() != n) throw std::runtime_error("Internal error");
 			}
 			samples.swap(newSamples);
 			sampleWeights.swap(newSampleWeights);
+			densityValues.swap(newDensityValues);
 		}
-		std::vector<mpfr_class> densityValues(nBernoullis+1);
-		mpfr_class power1 = trueProbability, power2 = 1 - trueProbability;
-		for(int i = 0; i <= nBernoullis; i++)
-		{
-			densityValues[i] = boost::multiprecision::pow(power1, i) * boost::multiprecision::pow(power2, nBernoullis-i);
-		}
-
 		mpfr_class estimate = 0;
 		for(std::size_t i = 0; i < samples.size(); i++)
 		{
-			estimate += densityValues[samples[i]] / sampleWeights[i];
+			estimate += densityValues[i] / sampleWeights[i];
 		}
 		return Rcpp::List::create(Rcpp::Named("estimate") = estimate.convert_to<double>());
 	END_RCPP

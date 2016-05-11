@@ -3,6 +3,6 @@
 #include "Rcpp.h"
 namespace particleMethodsBernoulli
 {
-	SEXP importanceResampling(SEXP nBernoullis, SEXP lowerBound, SEXP trueProbability, SEXP n, SEXP seed);
+	SEXP importanceResampling(SEXP lowerBound, SEXP trueProbabilities, SEXP n, SEXP seed);
 }
 #endif
