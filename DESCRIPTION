@@ -16,3 +16,5 @@ Collate:
 	'importanceSampling.R'
 	'importanceResampling.R'
 	'importanceResamplingWithoutReplacement.R'
+	'importanceResamplingAuxiliary.R'
+	'importanceResamplingWithoutReplacementAuxiliary.R'

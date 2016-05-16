@@ -1,3 +1,5 @@
 export(importanceSampling)
 export(importanceResampling)
 export(importanceResamplingWithoutReplacement)
+export(importanceResamplingAuxiliary)
+export(importanceResamplingWithoutReplacementAuxiliary)
