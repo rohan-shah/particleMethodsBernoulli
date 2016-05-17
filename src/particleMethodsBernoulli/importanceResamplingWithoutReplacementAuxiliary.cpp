@@ -75,20 +75,14 @@ namespace particleMethodsBernoulli
 		boost::random_number_generator<boost::mt19937> generator(randomSource);
 
 		double newProbability = (double)lowerBound / (double)nBernoullis;
-		std::vector<double> ratio1, ratio2;
-		for(std::vector<double>::iterator trueProbability = trueProbabilities.begin(); trueProbability != trueProbabilities.end(); trueProbability++)
-		{
-			ratio1.push_back(newProbability / *trueProbability);
-			ratio2.push_back((1 - newProbability) / (1 - *trueProbability));
-		}
 		//Initially we have two samples, corresponding to the first bernoulli being 0 or 1. Note that nBernoullis == 1 gives an error above, so we can assume that there are at least 2 bernoullis
 		std::vector<int> samples, newSamples;
 		std::vector<mpfr_class> sampleDensity, newSampleDensity;
 
 		samples.push_back(0);
 		samples.push_back(1);
-		sampleDensity.push_back(ratio2[0]);
-		sampleDensity.push_back(ratio1[0]);
+		sampleDensity.push_back(1 - trueProbabilities[0]);
+		sampleDensity.push_back(trueProbabilities[0]);
 		std::vector<int> choicesUp, choicesDown;
 
 		mpfr_class product = 1;
@@ -96,7 +90,6 @@ namespace particleMethodsBernoulli
 		{
 			choicesUp.clear();
 			choicesDown.clear();
-			//Sample and update the weights. Everything in weightRatio1 has a weight of averageWeight * ratio1[bernoulliCounter]. Everything in weightRatio2 has a weight of averageWeight * ratio2[bernouliCounter]. Anything in neither has a weight of 0. 
 			for(std::size_t i = 0; i < samples.size(); i++)
 			{
 				int maxPossible = samples[i] + nBernoullis - bernoulliCounter;

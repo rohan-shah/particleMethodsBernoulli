@@ -82,6 +82,8 @@ namespace particleMethodsBernoulli
 		std::vector<int> newValuesOfOne(n, 0);
 		std::vector<int> toSample;
 		std::vector<mpfr_class> weights(n, 1), newWeights(n, 1);
+
+		mpfr_class product = 1;
 		for(int bernoulliCounter = 0; bernoulliCounter < nBernoullis; bernoulliCounter++)
 		{
 			toSample.clear();
@@ -104,6 +106,7 @@ namespace particleMethodsBernoulli
 					}
 				}
 			}
+			product *= (double) toSample.size() / (double)n;
 			//Resampling step
 			if(toSample.size() == 0)
 			{
@@ -129,6 +132,7 @@ namespace particleMethodsBernoulli
 			sum += weights[i];
 		}
 		sum /= n;
+		sum *= product;
 		return Rcpp::List::create(Rcpp::Named("estimate") = sum.convert_to<double>());
 	END_RCPP
 	}
