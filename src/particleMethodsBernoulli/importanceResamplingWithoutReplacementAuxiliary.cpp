@@ -5,6 +5,7 @@
 #include <boost/random/uniform_int_distribution.hpp>
 #include <boost/random/random_number_generator.hpp>
 #include <boost/range/algorithm/random_shuffle.hpp>
+#include "sampfordFromParetoNaive.h"
 namespace particleMethodsBernoulli
 {
 	SEXP importanceResamplingWithoutReplacementAuxiliary(SEXP lowerBound_sexp, SEXP trueProbabilities_sexp, SEXP n_sexp, SEXP seed_sexp)
@@ -75,17 +76,25 @@ namespace particleMethodsBernoulli
 		boost::random_number_generator<boost::mt19937> generator(randomSource);
 
 		double newProbability = (double)lowerBound / (double)nBernoullis;
+		double complementaryNewProb = 1 - newProbability;
 		//Initially we have two samples, corresponding to the first bernoulli being 0 or 1. Note that nBernoullis == 1 gives an error above, so we can assume that there are at least 2 bernoullis
 		std::vector<int> samples, newSamples;
-		std::vector<mpfr_class> sampleDensity, newSampleDensity;
+		std::vector<mpfr_class> sampleDensity, newSampleDensity, trueDensity, newTrueDensity, productInclusionProbabilities(2, 1.0), newProductInclusionProbabilities;
 
 		samples.push_back(0);
 		samples.push_back(1);
-		sampleDensity.push_back(1 - trueProbabilities[0]);
-		sampleDensity.push_back(trueProbabilities[0]);
+		sampleDensity.push_back(complementaryNewProb);
+		sampleDensity.push_back(newProbability);
+
+		trueDensity.push_back(1-trueProbabilities[0]);
+		trueDensity.push_back(trueProbabilities[0]);
 		std::vector<int> choicesUp, choicesDown;
 
-		mpfr_class product = 1;
+		sampfordFromParetoNaiveArgs sampfordArgs;
+		sampfordArgs.n = n;
+		std::vector<int> sampfordSampleIndices;
+		std::vector<mpfr_class> sampfordSampleInclusionProbabilities, sampfordSampleWeights;
+
 		for(int bernoulliCounter = 1; bernoulliCounter < nBernoullis; bernoulliCounter++)
 		{
 			choicesUp.clear();
@@ -105,6 +114,8 @@ namespace particleMethodsBernoulli
 			}
 			newSamples.clear();
 			newSampleDensity.clear();
+			newProductInclusionProbabilities.clear();
+			newTrueDensity.clear();
 			double complementaryTrueProb = 1 - trueProbabilities[bernoulliCounter];
 			//We take every successor
 			if(choicesUp.size() + choicesDown.size() <= (std::size_t)n)
@@ -112,49 +123,58 @@ namespace particleMethodsBernoulli
 				for(std::size_t i = 0; i < choicesDown.size(); i++)
 				{
 					newSamples.push_back(samples[choicesDown[i]]);
-					newSampleDensity.push_back(sampleDensity[choicesDown[i]] * complementaryTrueProb);
+					newSampleDensity.push_back(sampleDensity[choicesDown[i]] * complementaryNewProb);
+					newTrueDensity.push_back(trueDensity[choicesDown[i]] * complementaryTrueProb);
+					newProductInclusionProbabilities.push_back(productInclusionProbabilities[choicesDown[i]]);
 				}
 				for(std::size_t i = 0; i < choicesUp.size(); i++)
 				{
 					newSamples.push_back(samples[choicesUp[i]]+1);
-					newSampleDensity.push_back(sampleDensity[choicesUp[i]] * trueProbabilities[bernoulliCounter]);
+					newSampleDensity.push_back(sampleDensity[choicesUp[i]] * newProbability);
+					newTrueDensity.push_back(trueDensity[choicesDown[i]] * trueProbabilities[bernoulliCounter]);
+					newProductInclusionProbabilities.push_back(productInclusionProbabilities[choicesUp[i]]);
 				}
 			}
 			else
 			{
-				product *= (double) (choicesUp.size() + choicesDown.size()) /  (double) n;
-				for(int i = 0; i < n; i++)
+				sampfordSampleWeights.clear();
+				for(std::size_t i = 0; i < choicesDown.size(); i++)
 				{
-					boost::random::bernoulli_distribution<> upOrDown((double)choicesUp.size() / ((double)choicesUp.size() + (double)choicesDown.size()));
-					if(upOrDown(randomSource))
+					sampfordSampleWeights.push_back(sampleDensity[choicesDown[i]] / productInclusionProbabilities[choicesDown[i]]);
+				}
+				for(std::size_t i = 0; i < choicesUp.size(); i++)
+				{
+					sampfordSampleWeights.push_back(sampleDensity[choicesUp[i]] / productInclusionProbabilities[choicesUp[i]]);
+				}
+				sampfordFromParetoNaive(sampfordArgs, sampfordSampleIndices, sampfordSampleInclusionProbabilities, sampfordSampleWeights, randomSource);
+				for(std::vector<int>::iterator j = sampfordSampleIndices.begin(); j != sampfordSampleIndices.end(); j++)
+				{
+					if(*j < (int)choicesDown.size())
 					{
-						boost::random::uniform_int_distribution<> randomUp(0, choicesUp.size() - 1);
-						int choice = randomUp(randomSource);
-						newSamples.push_back(samples[choicesUp[choice]]+1);
-						newSampleDensity.push_back(sampleDensity[choicesUp[choice]] * trueProbabilities[bernoulliCounter]);
-						if(choice != (int)choicesUp.size() - 1) std::swap(choicesUp.back(), choicesUp[choice]);
-						choicesUp.pop_back();
+						newSamples.push_back(samples[choicesDown[*j]]);
+						newSampleDensity.push_back(sampleDensity[choicesDown[*j]] * complementaryNewProb);
+						newTrueDensity.push_back(trueDensity[choicesDown[*j]] * complementaryTrueProb);
+						newProductInclusionProbabilities.push_back(productInclusionProbabilities[choicesDown[*j]] * sampfordSampleInclusionProbabilities[*j]);
 					}
 					else
 					{
-						boost::random::uniform_int_distribution<> randomDown(0, choicesDown.size() - 1);
-						int choice = randomDown(randomSource);
-						newSamples.push_back(samples[choicesDown[choice]]);
-						newSampleDensity.push_back(sampleDensity[choicesDown[choice]] * complementaryTrueProb);
-						if(choice != (int)choicesDown.size() - 1) std::swap(choicesDown.back(), choicesDown[choice]);
-						choicesDown.pop_back();
+						newSamples.push_back(samples[choicesUp[*j - choicesDown.size()]]+1);
+						newSampleDensity.push_back(sampleDensity[choicesUp[*j - choicesDown.size()]] * newProbability);
+						newTrueDensity.push_back(trueDensity[choicesUp[*j - choicesDown.size()]] * trueProbabilities[bernoulliCounter]);
+						newProductInclusionProbabilities.push_back(productInclusionProbabilities[choicesUp[*j - choicesDown.size()]] * sampfordSampleInclusionProbabilities[*j]);
 					}
 				}
 			}
 			samples.swap(newSamples);
 			sampleDensity.swap(newSampleDensity);
+			trueDensity.swap(newTrueDensity);
+			productInclusionProbabilities.swap(newProductInclusionProbabilities);
 		}
 		mpfr_class estimate = 0;
 		for(std::size_t i = 0; i < samples.size(); i++)
 		{
-			estimate += sampleDensity[i];
+			estimate += trueDensity[i] / productInclusionProbabilities[i];
 		}
-		estimate *= product;
 		return Rcpp::List::create(Rcpp::Named("estimate") = estimate.convert_to<double>());
 	END_RCPP
 	}

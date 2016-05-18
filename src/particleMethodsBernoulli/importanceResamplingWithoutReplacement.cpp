@@ -97,7 +97,6 @@ namespace particleMethodsBernoulli
 		std::vector<int> sampfordSampleIndices;
 		std::vector<mpfr_class> sampfordSampleInclusionProbabilities, sampfordSampleWeights;
 
-		mpfr_class product = 1;
 		for(int bernoulliCounter = 1; bernoulliCounter < nBernoullis; bernoulliCounter++)
 		{
 			choicesUp.clear();
