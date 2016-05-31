@@ -20,6 +20,7 @@ endif()
 
 find_package(Boost 1.53.0 COMPONENTS graph REQUIRED)
 find_package(maxFlowAlgorithms REQUIRED CONFIG)
+find_package(sampling REQUIRED CONFIG)
 find_package(Rcpp REQUIRED)
 
 add_subdirectory(src)

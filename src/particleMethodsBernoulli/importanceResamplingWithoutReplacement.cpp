@@ -5,7 +5,7 @@
 #include <boost/random/uniform_int_distribution.hpp>
 #include <boost/random/random_number_generator.hpp>
 #include <boost/range/algorithm/random_shuffle.hpp>
-#include "sampfordFromParetoNaive.h"
+#include "sampford.h"
 namespace particleMethodsBernoulli
 {
 	SEXP importanceResamplingWithoutReplacement(SEXP lowerBound_sexp, SEXP trueProbabilities_sexp, SEXP n_sexp, SEXP seed_sexp)
@@ -76,32 +76,28 @@ namespace particleMethodsBernoulli
 		boost::random_number_generator<boost::mt19937> generator(randomSource);
 
 		double newProbability = (double)lowerBound / (double)nBernoullis;
-		std::vector<double> ratio1, ratio2;
-		for(std::vector<double>::iterator trueProbability = trueProbabilities.begin(); trueProbability != trueProbabilities.end(); trueProbability++)
-		{
-			ratio1.push_back(newProbability / *trueProbability);
-			ratio2.push_back((1 - newProbability) / (1 - *trueProbability));
-		}
+		mpfr_class newProbability_mpfr = newProbability, compNewProbability_mpfr = 1 - newProbability;
 		//Initially we have two samples, corresponding to the first bernoulli being 0 or 1. Note that nBernoullis == 1 gives an error above, so we can assume that there are at least 2 bernoullis
 		std::vector<int> samples, newSamples;
-		std::vector<mpfr_class> sampleDensityOnWeight, newSampleDensityOnWeight;
+		std::vector<mpfr_class> sampleDensityOnWeight, newSampleDensityOnWeight, sampfordWeights, newSampfordWeights, copiedWeights;
 
 		samples.push_back(0);
 		samples.push_back(1);
 		sampleDensityOnWeight.push_back(1-trueProbabilities[0]);
 		sampleDensityOnWeight.push_back(trueProbabilities[0]);
+		sampfordWeights.push_back(compNewProbability_mpfr);
+		sampfordWeights.push_back(newProbability_mpfr);
 		std::vector<int> choicesUp, choicesDown;
 
-		sampfordFromParetoNaiveArgs sampfordArgs;
+		sampling::sampfordFromParetoNaiveArgs sampfordArgs;
 		sampfordArgs.n = n;
 		std::vector<int> sampfordSampleIndices;
-		std::vector<mpfr_class> sampfordSampleInclusionProbabilities, sampfordSampleWeights;
+		std::vector<mpfr_class> sampfordSampleInclusionProbabilities;
 
 		for(int bernoulliCounter = 1; bernoulliCounter < nBernoullis; bernoulliCounter++)
 		{
 			choicesUp.clear();
 			choicesDown.clear();
-			//Sample and update the weights. Everything in weightRatio1 has a weight of averageWeight * ratio1[bernoulliCounter]. Everything in weightRatio2 has a weight of averageWeight * ratio2[bernouliCounter]. Anything in neither has a weight of 0. 
 			for(std::size_t i = 0; i < samples.size(); i++)
 			{
 				int maxPossible = samples[i] + nBernoullis - bernoulliCounter;
@@ -117,6 +113,7 @@ namespace particleMethodsBernoulli
 			}
 			newSamples.clear();
 			newSampleDensityOnWeight.clear();
+			newSampfordWeights.clear();
 			double complementaryTrueProb = 1 - trueProbabilities[bernoulliCounter];
 			//We take every successor
 			if(choicesUp.size() + choicesDown.size() <= (std::size_t)n)
@@ -125,25 +122,28 @@ namespace particleMethodsBernoulli
 				{
 					newSamples.push_back(samples[choicesDown[i]]);
 					newSampleDensityOnWeight.push_back(sampleDensityOnWeight[choicesDown[i]] * complementaryTrueProb);
+					newSampfordWeights.push_back(sampfordWeights[choicesDown[i]]*compNewProbability_mpfr);
 				}
 				for(std::size_t i = 0; i < choicesUp.size(); i++)
 				{
 					newSamples.push_back(samples[choicesUp[i]]+1);
 					newSampleDensityOnWeight.push_back(sampleDensityOnWeight[choicesUp[i]] * trueProbabilities[bernoulliCounter]);
+					newSampfordWeights.push_back(sampfordWeights[choicesUp[i]]*newProbability_mpfr);
 				}
+				newSampfordWeights.swap(sampfordWeights);
 			}
 			else
 			{
-				sampfordSampleWeights.clear();
 				for(std::size_t i = 0; i < choicesDown.size(); i++)
 				{
-					sampfordSampleWeights.push_back(sampleDensityOnWeight[choicesDown[i]] * ratio2[bernoulliCounter]);
+					newSampfordWeights.push_back(sampfordWeights[choicesDown[i]] * compNewProbability_mpfr);
 				}
 				for(std::size_t i = 0; i < choicesUp.size(); i++)
 				{
-					sampfordSampleWeights.push_back(sampleDensityOnWeight[choicesUp[i]] * ratio1[bernoulliCounter]);
+					newSampfordWeights.push_back(sampfordWeights[choicesUp[i]] * newProbability_mpfr);
 				}
-				sampfordFromParetoNaive(sampfordArgs, sampfordSampleIndices, sampfordSampleInclusionProbabilities, sampfordSampleWeights, randomSource);
+				sampling::sampfordFromParetoNaive(sampfordArgs, sampfordSampleIndices, sampfordSampleInclusionProbabilities, newSampfordWeights, randomSource, copiedWeights);
+				sampfordWeights.clear();
 				for(std::vector<int>::iterator j = sampfordSampleIndices.begin(); j != sampfordSampleIndices.end(); j++)
 				{
 					if(*j < (int)choicesDown.size())
@@ -156,6 +156,7 @@ namespace particleMethodsBernoulli
 						newSamples.push_back(samples[choicesUp[*j - choicesDown.size()]]+1);
 						newSampleDensityOnWeight.push_back(sampleDensityOnWeight[choicesUp[*j - choicesDown.size()]] * trueProbabilities[bernoulliCounter]/ sampfordSampleInclusionProbabilities[*j]);
 					}
+					sampfordWeights.push_back(newSampfordWeights[*j] / sampfordSampleInclusionProbabilities[*j]);
 				}
 			}
 			samples.swap(newSamples);
