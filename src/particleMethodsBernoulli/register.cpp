@@ -7,6 +7,7 @@
 #include "importanceSampling.h"
 #include "importanceResampling.h"
 #include "importanceResamplingWithoutReplacement.h"
+#include "importanceResamplingWithoutReplacementS2.h"
 #include "importanceResamplingAuxiliary.h"
 #include "includeMPFR.h"
 extern "C" const char* package_name = "particleMethodsBernoulli";
@@ -16,6 +17,7 @@ R_CallMethodDef callMethods[] =
 	{"importanceResampling", (DL_FUNC)&particleMethodsBernoulli::importanceResampling, 4},
 	{"importanceResamplingAuxiliary", (DL_FUNC)&particleMethodsBernoulli::importanceResamplingAuxiliary, 4},
 	{"importanceResamplingWithoutReplacement", (DL_FUNC)&particleMethodsBernoulli::importanceResamplingWithoutReplacement, 4},
+	{"importanceResamplingWithoutReplacementS2", (DL_FUNC)&particleMethodsBernoulli::importanceResamplingWithoutReplacementS2, 5},
 	{NULL, NULL, 0}
 };
 RcppExport void R_init_particleMethodsBernoulli(DllInfo *info)

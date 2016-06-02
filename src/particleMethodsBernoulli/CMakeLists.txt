@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1)
-set(CppFiles importanceSampling.cpp register.cpp importanceResampling.cpp importanceResamplingWithoutReplacement.cpp importanceResamplingAuxiliary.cpp)
-set(HeaderFiles importanceSampling.h includeMPFR.h importanceResampling.h importanceResamplingWithoutReplacement.h importanceResamplingAuxiliary.h)
+set(CppFiles importanceSampling.cpp register.cpp importanceResampling.cpp importanceResamplingWithoutReplacement.cpp importanceResamplingAuxiliary.cpp importanceResamplingWithoutReplacementS2.cpp)
+set(HeaderFiles importanceSampling.h includeMPFR.h importanceResampling.h importanceResamplingWithoutReplacement.h importanceResamplingAuxiliary.h importanceResamplingWithoutReplacementS2.h)
 add_library(particleMethodsBernoulliRPackage SHARED ${CppFiles} ${HeaderFiles})
 target_link_libraries(particleMethodsBernoulliRPackage PUBLIC ${Boost_LIBRARIES} Rcpp mpfr sampling)
 target_include_directories(particleMethodsBernoulliRPackage PUBLIC ${Boost_INCLUDE_DIRS})
