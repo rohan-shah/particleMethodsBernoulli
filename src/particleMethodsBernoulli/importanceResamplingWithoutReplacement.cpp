@@ -79,7 +79,7 @@ namespace particleMethodsBernoulli
 		mpfr_class newProbability_mpfr = newProbability, compNewProbability_mpfr = 1 - newProbability;
 		//Initially we have two samples, corresponding to the first bernoulli being 0 or 1. Note that nBernoullis == 1 gives an error above, so we can assume that there are at least 2 bernoullis
 		std::vector<int> samples, newSamples;
-		std::vector<mpfr_class> sampleDensityOnWeight, newSampleDensityOnWeight, sampfordWeights, newSampfordWeights, copiedWeights;
+		std::vector<mpfr_class> sampleDensityOnWeight, newSampleDensityOnWeight, sampfordWeights, newSampfordWeights, rescaledWeights;
 
 		samples.push_back(0);
 		samples.push_back(1);
@@ -93,6 +93,10 @@ namespace particleMethodsBernoulli
 		sampfordArgs.n = n;
 		std::vector<int> sampfordSampleIndices;
 		std::vector<mpfr_class> sampfordSampleInclusionProbabilities;
+		sampfordArgs.indices = &sampfordSampleIndices;
+		sampfordArgs.inclusionProbabilities = &sampfordSampleInclusionProbabilities;
+		sampfordArgs.weights = &newSampfordWeights;
+		sampfordArgs.rescaledWeights = &rescaledWeights;
 
 		for(int bernoulliCounter = 1; bernoulliCounter < nBernoullis; bernoulliCounter++)
 		{
@@ -142,7 +146,7 @@ namespace particleMethodsBernoulli
 				{
 					newSampfordWeights.push_back(sampfordWeights[choicesUp[i]] * newProbability_mpfr);
 				}
-				sampling::sampfordFromParetoNaive(sampfordArgs, sampfordSampleIndices, sampfordSampleInclusionProbabilities, newSampfordWeights, randomSource, copiedWeights);
+				sampling::sampfordFromParetoNaive(sampfordArgs, randomSource);
 				sampfordWeights.clear();
 				for(std::vector<int>::iterator j = sampfordSampleIndices.begin(); j != sampfordSampleIndices.end(); j++)
 				{
