@@ -104,7 +104,7 @@ namespace particleMethodsBernoulli
 		}
 		//Initially we have two samples, corresponding to the first bernoulli being 0 or 1. Note that nBernoullis == 1 gives an error above, so we can assume that there are at least 2 bernoullis
 		std::vector<int> samples, newSamples;
-		std::vector<mpfr_class> sampleDensityOnWeight, newSampleDensityOnWeight, sampfordWeights, sampfordWeights2, newSampfordWeights, rescaledWeights;
+		std::vector<mpfr_class> sampleDensityOnWeight, newSampleDensityOnWeight, sampfordWeights, sampfordWeights2, newSampfordWeights;
 		std::vector<unsigned int> bits, newBits;
 
 		samples.push_back(0);
@@ -120,12 +120,6 @@ namespace particleMethodsBernoulli
 
 		sampling::sampfordFromParetoNaiveArgs sampfordArgs;
 		sampfordArgs.n = n;
-		std::vector<int> sampfordSampleIndices;
-		std::vector<mpfr_class> sampfordSampleInclusionProbabilities;
-		sampfordArgs.indices = &sampfordSampleIndices;
-		sampfordArgs.inclusionProbabilities = &sampfordSampleInclusionProbabilities;
-		sampfordArgs.weights = &newSampfordWeights;
-		sampfordArgs.rescaledWeights = &rescaledWeights;
 
 		for(int bernoulliCounter = 1; bernoulliCounter < nBernoullis; bernoulliCounter++)
 		{
@@ -214,27 +208,30 @@ namespace particleMethodsBernoulli
 				{
 					newSampfordWeights.push_back(sampfordWeights[choicesUp[i]] * powers[countBits(bits[choicesUp[i]])+1]);
 				}
+				sampfordArgs.weights.swap(newSampfordWeights);
 				sampling::sampfordFromParetoNaive(sampfordArgs, randomSource);
+				sampfordArgs.weights.swap(newSampfordWeights);
+
 				sampfordWeights2.clear();
-				for(std::vector<int>::iterator j = sampfordSampleIndices.begin(); j != sampfordSampleIndices.end(); j++)
+				for(std::vector<int>::iterator j = sampfordArgs.indices.begin(); j != sampfordArgs.indices.end(); j++)
 				{
 					if(*j < (int)choicesDown.size())
 					{
 						newSamples.push_back(samples[choicesDown[*j]]);
-						newSampleDensityOnWeight.push_back(sampleDensityOnWeight[choicesDown[*j]] * complementaryTrueProb / sampfordSampleInclusionProbabilities[*j]);
+						newSampleDensityOnWeight.push_back(sampleDensityOnWeight[choicesDown[*j]] * complementaryTrueProb / sampfordArgs.inclusionProbabilities[*j]);
 						if(bernoulliCounter <= k-1)
 						{
-							sampfordWeights2.push_back(sampfordWeights[choicesDown[*j]] / sampfordSampleInclusionProbabilities[*j]);
+							sampfordWeights2.push_back(sampfordWeights[choicesDown[*j]] / sampfordArgs.inclusionProbabilities[*j]);
 						}
 						else
 						{
 							if(bits[choicesDown[*j]] & 1U)
 							{
-								sampfordWeights2.push_back(sampfordWeights[choicesDown[*j]]*trueProbPrevious / sampfordSampleInclusionProbabilities[*j]);
+								sampfordWeights2.push_back(sampfordWeights[choicesDown[*j]]*trueProbPrevious / sampfordArgs.inclusionProbabilities[*j]);
 							}
 							else
 							{
-								sampfordWeights2.push_back(sampfordWeights[choicesDown[*j]]*complementaryTrueProbPrevious / sampfordSampleInclusionProbabilities[*j]);
+								sampfordWeights2.push_back(sampfordWeights[choicesDown[*j]]*complementaryTrueProbPrevious / sampfordArgs.inclusionProbabilities[*j]);
 							}
 						}
 						newBits.push_back((bits[choicesDown[*j]] >> 1));
@@ -243,20 +240,20 @@ namespace particleMethodsBernoulli
 					{
 						int choiceUpIndex = choicesUp[*j - choicesDown.size()];
 						newSamples.push_back(samples[choiceUpIndex]+1);
-						newSampleDensityOnWeight.push_back(sampleDensityOnWeight[choiceUpIndex] * trueProb / sampfordSampleInclusionProbabilities[*j]);
+						newSampleDensityOnWeight.push_back(sampleDensityOnWeight[choiceUpIndex] * trueProb / sampfordArgs.inclusionProbabilities[*j]);
 						if(bernoulliCounter <= k-1)
 						{
-							sampfordWeights2.push_back(sampfordWeights[choiceUpIndex] / sampfordSampleInclusionProbabilities[*j]);
+							sampfordWeights2.push_back(sampfordWeights[choiceUpIndex] / sampfordArgs.inclusionProbabilities[*j]);
 						}
 						else
 						{
 							if(bits[choiceUpIndex] & 1U)
 							{
-								sampfordWeights2.push_back(sampfordWeights[choiceUpIndex]*trueProbPrevious / sampfordSampleInclusionProbabilities[*j]);
+								sampfordWeights2.push_back(sampfordWeights[choiceUpIndex]*trueProbPrevious / sampfordArgs.inclusionProbabilities[*j]);
 							}
 							else
 							{
-								sampfordWeights2.push_back(sampfordWeights[choiceUpIndex]*complementaryTrueProbPrevious / sampfordSampleInclusionProbabilities[*j]);
+								sampfordWeights2.push_back(sampfordWeights[choiceUpIndex]*complementaryTrueProbPrevious / sampfordArgs.inclusionProbabilities[*j]);
 							}
 						}
 						newBits.push_back((bits[choiceUpIndex] >> 1) + (1U << (k-1)));

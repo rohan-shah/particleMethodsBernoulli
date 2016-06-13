@@ -91,12 +91,6 @@ namespace particleMethodsBernoulli
 
 		sampling::sampfordFromParetoNaiveArgs sampfordArgs;
 		sampfordArgs.n = n;
-		std::vector<int> sampfordSampleIndices;
-		std::vector<mpfr_class> sampfordSampleInclusionProbabilities;
-		sampfordArgs.indices = &sampfordSampleIndices;
-		sampfordArgs.inclusionProbabilities = &sampfordSampleInclusionProbabilities;
-		sampfordArgs.weights = &newSampfordWeights;
-		sampfordArgs.rescaledWeights = &rescaledWeights;
 
 		for(int bernoulliCounter = 1; bernoulliCounter < nBernoullis; bernoulliCounter++)
 		{
@@ -146,21 +140,24 @@ namespace particleMethodsBernoulli
 				{
 					newSampfordWeights.push_back(sampfordWeights[choicesUp[i]] * newProbability_mpfr);
 				}
+				sampfordArgs.weights.swap(newSampfordWeights);
 				sampling::sampfordFromParetoNaive(sampfordArgs, randomSource);
+				sampfordArgs.weights.swap(newSampfordWeights);
+
 				sampfordWeights.clear();
-				for(std::vector<int>::iterator j = sampfordSampleIndices.begin(); j != sampfordSampleIndices.end(); j++)
+				for(std::vector<int>::iterator j = sampfordArgs.indices.begin(); j != sampfordArgs.indices.end(); j++)
 				{
 					if(*j < (int)choicesDown.size())
 					{
 						newSamples.push_back(samples[choicesDown[*j]]);
-						newSampleDensityOnWeight.push_back(sampleDensityOnWeight[choicesDown[*j]] * complementaryTrueProb / sampfordSampleInclusionProbabilities[*j]);
+						newSampleDensityOnWeight.push_back(sampleDensityOnWeight[choicesDown[*j]] * complementaryTrueProb / sampfordArgs.inclusionProbabilities[*j]);
 					}
 					else
 					{
 						newSamples.push_back(samples[choicesUp[*j - choicesDown.size()]]+1);
-						newSampleDensityOnWeight.push_back(sampleDensityOnWeight[choicesUp[*j - choicesDown.size()]] * trueProbabilities[bernoulliCounter]/ sampfordSampleInclusionProbabilities[*j]);
+						newSampleDensityOnWeight.push_back(sampleDensityOnWeight[choicesUp[*j - choicesDown.size()]] * trueProbabilities[bernoulliCounter]/ sampfordArgs.inclusionProbabilities[*j]);
 					}
-					sampfordWeights.push_back(newSampfordWeights[*j] / sampfordSampleInclusionProbabilities[*j]);
+					sampfordWeights.push_back(newSampfordWeights[*j] / sampfordArgs.inclusionProbabilities[*j]);
 				}
 			}
 			samples.swap(newSamples);
