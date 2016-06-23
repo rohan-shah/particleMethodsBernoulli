@@ -79,7 +79,7 @@ namespace particleMethodsBernoulli
 		mpfr_class newProbability_mpfr = newProbability, compNewProbability_mpfr = 1 - newProbability;
 		//Initially we have two samples, corresponding to the first bernoulli being 0 or 1. Note that nBernoullis == 1 gives an error above, so we can assume that there are at least 2 bernoullis
 		std::vector<int> samples, newSamples;
-		std::vector<mpfr_class> sampleDensityOnWeight, newSampleDensityOnWeight, sampfordWeights, newSampfordWeights, rescaledWeights;
+		std::vector<mpfr_class> sampleDensityOnWeight, newSampleDensityOnWeight, sampfordWeights, newSampfordWeights;
 
 		samples.push_back(0);
 		samples.push_back(1);
@@ -150,14 +150,14 @@ namespace particleMethodsBernoulli
 					if(*j < (int)choicesDown.size())
 					{
 						newSamples.push_back(samples[choicesDown[*j]]);
-						newSampleDensityOnWeight.push_back(sampleDensityOnWeight[choicesDown[*j]] * complementaryTrueProb / sampfordArgs.inclusionProbabilities[*j]);
+						newSampleDensityOnWeight.push_back(sampleDensityOnWeight[choicesDown[*j]] * complementaryTrueProb / sampfordArgs.rescaledWeights[*j]);
 					}
 					else
 					{
 						newSamples.push_back(samples[choicesUp[*j - choicesDown.size()]]+1);
-						newSampleDensityOnWeight.push_back(sampleDensityOnWeight[choicesUp[*j - choicesDown.size()]] * trueProbabilities[bernoulliCounter]/ sampfordArgs.inclusionProbabilities[*j]);
+						newSampleDensityOnWeight.push_back(sampleDensityOnWeight[choicesUp[*j - choicesDown.size()]] * trueProbabilities[bernoulliCounter]/ sampfordArgs.rescaledWeights[*j]);
 					}
-					sampfordWeights.push_back(newSampfordWeights[*j] / sampfordArgs.inclusionProbabilities[*j]);
+					sampfordWeights.push_back(newSampfordWeights[*j] / sampfordArgs.rescaledWeights[*j]);
 				}
 			}
 			samples.swap(newSamples);
